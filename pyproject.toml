@@ -7,7 +7,8 @@ name = "or-trace"
 version = "0.1.0"
 description = "Explainable financial transaction lineage service"
 requires-python = ">=3.9"
-dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "uvicorn>=0.30,<1"]
+# Keep schema generators identical across Python versions for the versioned OpenAPI.
+dependencies = ["fastapi==0.128.8", "pydantic==2.13.5", "uvicorn>=0.30,<1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "httpx>=0.27,<1", "ruff>=0.9,<1"]

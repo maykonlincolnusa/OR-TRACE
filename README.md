@@ -210,6 +210,8 @@ de moedas, regras e montantes inválidos. Testes do adaptador verificam rollback
 idempotência, referências e outbox. Testes HTTP exercitam autenticação, validação,
 normalização UTC, decimais, correlação e métricas. Dispatcher é testado em sucesso e falha.
 CI executa pytest e Ruff em Python 3.9/3.12.
+FastAPI e Pydantic têm versões fixadas para manter o contrato OpenAPI reproduzível
+entre as versões de Python. Atualizações devem regenerar o contrato e passar pela matriz de CI.
 
 Próximas camadas: testes de contrato comuns a todos os adaptadores; integração com
 PostgreSQL/broker/grafo; concorrência e falhas entre commit/ack; propriedades de conservação
