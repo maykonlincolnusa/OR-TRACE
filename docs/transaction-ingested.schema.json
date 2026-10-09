@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:or-trace:transaction-ingested:1",
+  "title": "OR TRACE transaction.ingested v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "schema_version", "occurred_at", "aggregate_id", "correlation_id", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "transaction.ingested"},
+    "schema_version": {"const": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "aggregate_id": {"type": "string", "minLength": 1},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_account_id", "destination_account_id", "amount", "currency", "occurred_at", "source_system", "external_id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "source_account_id": {"type": "string", "minLength": 1},
+        "destination_account_id": {"type": "string", "minLength": 1},
+        "amount": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,8})?$", "description": "Positive decimal, maximum 28 digits; enforced by producer"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "source_system": {"type": "string", "minLength": 1},
+        "external_id": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
