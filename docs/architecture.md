@@ -1,65 +1,33 @@
-# Decisões de engenharia
+# Engineering decisions
 
-## ADR 001 — Domínio independente
+## ADR 001 — Independent domain
 
-Dataclasses e Decimal definem fatos financeiros imutáveis. Protocols definem portas;
-FastAPI, Pydantic e armazenamento ficam nas bordas. Serviços recebem Ledger por injeção.
-A moeda segue um código de três letras; cadastro ISO 4217 e escala específica de cada
-moeda são validações futuras. O contrato atual suporta até oito casas decimais.
+Dataclasses and `Decimal` define immutable financial facts. Protocols define ports; FastAPI, Pydantic, and storage stay at the boundaries. Services receive the Ledger through dependency injection. Currency currently uses a three-letter code and supports up to eight decimal places. ISO 4217 membership and currency-specific scale are future validations.
 
-## ADR 002 — Ledger e outbox atômicos
+## ADR 002 — Atomic ledger and outbox
 
-Persistir transações e eventos na mesma unidade de trabalho evita perder notificações.
-O adaptador de memória usa lock e cópia antes do commit. O contrato PostgreSQL deve usar
-BEGIN/COMMIT e restrições únicas, comparando conteúdo em retries: ON CONFLICT DO NOTHING
-isoladamente esconderia divergências. Há chave de negócio (source_system, external_id)
-e chave interna id. Reprocessamento idêntico não cria outro evento.
+Transactions and events must be persisted in one unit of work so committed facts cannot lose notifications. The memory adapter uses a lock and copy-before-commit. A PostgreSQL adapter should use transactions and unique constraints while comparing retry content; `ON CONFLICT DO NOTHING` alone could hide divergent payloads.
 
-O dispatcher entrega pelo menos uma vez. Falha depois do ack e antes da marcação pode
-duplicar mensagens. Consumidores implementam inbox atômica com a atualização da projeção,
-retentativas com backoff, dead letter e replay. O exemplo não inicia workers nem broker.
+Internal ID and `(source_system, external_id)` are unique. Identical reprocessing is a no-op. The dispatcher provides at-least-once delivery: consumers need an inbox or event key updated atomically with their local projection, retry/backoff, dead-letter handling, and replay procedures.
 
-## ADR 003 — Grafo como projeção reconstruível
+## ADR 003 — Graph as a rebuildable projection
 
-Nós Entity e Account; aresta OWNS de Entity para Account; arestas TRANSFER de Account
-para Account, identificadas por transaction_id, com amount, currency e occurred_at.
-O consumidor de transaction.ingested realiza upsert idempotente. Em tecnologias que
-não suportam arestas paralelas identificáveis, Transaction vira nó intermediário.
-Cadastros são carregados pelo ledger/snapshot; seus eventos de mudança serão uma extensão
-versionada. GraphProjection é uma porta preparada, ainda não usada pelo motor de consulta.
-Monitorar lag e watermark da projeção; leitura investigativa deve indicar corte consistente.
-Nesta versão, snapshot do ledger em memória é a única fonte de consulta.
+Entity and Account are nodes; OWNS links an entity to an account; TRANSFER links accounts and carries transaction ID, amount, currency, and time. `transaction.ingested` consumers perform idempotent upserts. The current query engine reads a consistent Ledger snapshot; the `GraphProjection` port describes a future projection.
 
-## ADR 004 — Sem inferência falsa de propriedade
+Production designs must expose projection lag and a consistent watermark. Registration-change events and a durable graph adapter are not implemented.
 
-O algoritmo DFS percorre caminhos temporalmente válidos, em uma única moeda, com
-timestamps estritamente crescentes. Backward inverte a navegação, mas devolve a linhagem
-em ordem cronológica. Empates temporais não estabelecem causalidade e não são conectados.
-Para no primeiro retorno a uma conta. Uma entrada inicia apenas a partir da conta consultada;
-não pressupõe saldo inicial nem procura instituições fora da base.
+## ADR 004 — No false ownership inference
 
-O mínimo dos valores das arestas é somente um teto por caminho. Não existe alocação
-conservativa entre caminhos sobrepostos, FIFO, LIFO, proportional taint ou conversão FX.
-Saldos anteriores, receitas externas e mistura de fundos exigem política explícita de
-atribuição, reconciliação de saldos e rastreio da parcela atribuída antes de qualquer
-afirmação de origem econômica. Contas com pass-through são candidatas baseadas em pares,
-não classificação definitiva baseada no balanço completo.
+The traversal enumerates temporally valid paths in one currency with strictly increasing timestamps. Backward search reverses navigation but returns chronological lineage. Equal timestamps do not establish causality. Traversal stops on the first repeated account.
 
-## ADR 005 — Limites e desempenho
+The minimum edge amount is only a per-path upper bound. The engine does not allocate conserved funds across overlapping paths, apply FIFO/LIFO/proportional taint, convert FX, reconstruct prior balances, or infer economic origin and beneficial ownership. Any stronger attribution needs an explicit policy, balance reconciliation, and validation.
 
-Consultas aceitam 1–10 hops e 1–1000 caminhos. Há teto interno de 10.000 expansões.
-truncated é conservador: alcançar um teto já pode sinalizar incompletude. Não oferece
-paginação nem ranking dos caminhos mais arriscados. Ordenação determinística por tempo/id.
-O snapshot e a indexação inicial custam O(T); enumeração pode crescer exponencialmente
-até os limites. Fan-in/out consideram todo o intervalo e moeda da consulta, inclusive
-arestas fora do caminho. Não interpretar essas evidências como causalidade temporal.
-Antes de produção: consulta indexada por janela, jobs assíncronos, quotas, timeout,
-cancelamento e orçamento de memória, sem truncamento silencioso.
+## ADR 005 — Query budgets and evidence snapshots
 
-## ADR 006 — Risco explicável
+Queries accept 1–10 hops and 1–1,000 paths, with an internal expansion budget. Inputs require time-zone-aware dates, a valid currency code, and bounded windows. Every result records the number of transactions in the analyzed snapshot and a SHA-256 fingerprint of its canonical representation. This supports reproducibility but is not a signature or proof that upstream data was complete.
 
-Score heurístico versionado (1.0), soma de pesos distintos limitada a 100. Não é probabilidade,
-modelo calibrado, classificação regulatória ou decisão automática. Uma regra contribui
-uma vez ao score e pode produzir múltiplas evidências. Pesos/limiares estão no serviço
-e sua alteração exige versão e validação de regressão. Configuração externa, aprovação
-de regras, datasets rotulados e análise de falsos positivos fazem parte do roadmap.
+Path enumeration can grow exponentially. Production work includes indexed window queries, asynchronous jobs, tenant quotas, cancellation, timeouts, memory budgets, pagination, and visible truncation.
+
+## ADR 006 — Explainable risk
+
+The versioned heuristic score sums distinct rule weights and caps at 100. It is not a probability, regulatory classification, or automatic decision. Evidence names the transactions and accounts supporting each hypothesis. Rule changes require a new version, governance approval, and regression and detection-quality testing.

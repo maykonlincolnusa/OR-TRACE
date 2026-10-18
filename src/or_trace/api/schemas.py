@@ -77,6 +77,8 @@ class TraceOutput(BaseModel):
     paths: List[PathOutput]
     truncated: bool
     expansions: int
+    snapshot_sha256: str
+    transaction_count: int
     rule_version: str
     attribution_method: str
     assumptions: List[str]

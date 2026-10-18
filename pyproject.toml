@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "or-trace"
-version = "0.1.0"
+version = "0.2.0"
 description = "Explainable financial transaction lineage service"
 requires-python = ">=3.9"
 # Keep schema generators identical across Python versions for the versioned OpenAPI.

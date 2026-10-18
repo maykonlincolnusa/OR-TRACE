@@ -1,10 +1,13 @@
 """Temporal reachability, not an assertion of ownership of fungible money."""
 
+import re
 from collections import defaultdict
+from datetime import datetime
 from decimal import Decimal
 
 from or_trace.domain.models import Finding, Path
 from or_trace.domain.ports import Ledger
+from or_trace.services.evidence import snapshot_fingerprint
 
 
 class TraceService:
@@ -26,6 +29,19 @@ class TraceService:
         max_paths=100,
         max_expansions=10000,
     ):
+        for name, value, maximum in (
+            ("max_hops", max_hops, 10),
+            ("max_paths", max_paths, 1000),
+            ("max_expansions", max_expansions, 10000),
+        ):
+            if type(value) is not int or not 1 <= value <= maximum:
+                raise ValueError(f"{name} must be an integer between 1 and {maximum}")
+        if not isinstance(start, datetime) or not isinstance(end, datetime):
+            raise ValueError("query bounds must be datetime values")
+        if start.utcoffset() is None or end.utcoffset() is None:
+            raise ValueError("query bounds require timezone")
+        if not isinstance(currency, str) or not re.fullmatch(r"[A-Z]{3}", currency):
+            raise ValueError("currency requires three uppercase ASCII letters")
         if direction not in ("forward", "backward"):
             raise ValueError("invalid direction")
         if not self.ledger.has_account(account_id):
@@ -37,6 +53,7 @@ class TraceService:
             for t in self.ledger.snapshot()
             if start <= t.occurred_at <= end and t.currency == currency
         ]
+        transactions.sort(key=lambda tx: (tx.occurred_at, tx.id))
         outgoing, incoming = defaultdict(list), defaultdict(list)
         for tx in transactions:
             outgoing[tx.source_account_id].append(tx)
@@ -85,6 +102,8 @@ class TraceService:
             "paths": paths[:max_paths],
             "truncated": truncated,
             "expansions": expansions,
+            "snapshot_sha256": snapshot_fingerprint(transactions),
+            "transaction_count": len(transactions),
             "rule_version": self.RULE_VERSION,
             "attribution_method": "temporal_reachability",
             "assumptions": [

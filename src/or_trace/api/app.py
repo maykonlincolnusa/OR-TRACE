@@ -23,7 +23,7 @@ def create_app(ledger=None, audit=None, api_key=None, environment=None):
         raise RuntimeError("OR_TRACE_API_KEY is required outside development")
     if environment != "development" and ledger is None:
         raise RuntimeError("A durable Ledger adapter is required outside development")
-    app = FastAPI(title="OR TRACE", version="0.1.0")
+    app = FastAPI(title="OR TRACE", version="0.2.0")
     app.state.ledger = ledger if ledger is not None else MemoryLedger()
     audit = audit if audit is not None else LoggingAuditSink()
     ingestion = IngestionService(app.state.ledger)
