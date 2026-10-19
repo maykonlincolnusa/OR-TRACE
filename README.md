@@ -56,7 +56,7 @@ The Ledger is the source of truth; a graph database is a rebuildable future proj
 5. Identical retries are no-ops; a reused ID or external key with different content returns a conflict.
 6. Publish events at least once; downstream consumers must deduplicate atomically.
 7. Trace a Ledger snapshot within one time window, currency, direction, and explicit work budget.
-8. Return paths, rule evidence, truncation, analyzed transaction count, and a canonical snapshot SHA-256 fingerprint.
+8. Return paths, rule evidence, truncation, analyzed transaction count, a canonical snapshot fingerprint, and conservative residual-capacity allocations.
 
 The fingerprint supports reproducibility of the analyzed snapshot. It is not a digital signature, an attestation of upstream completeness, or a substitute for governed data lineage.
 
@@ -71,7 +71,7 @@ The fingerprint supports reproducibility of the analyzed snapshot. It is not a d
 | `GET /health/live` | Public process liveness |
 | `GET /metrics` | Aggregate Prometheus-style counters |
 
-Trace requires time-zone-aware `start` and `end` plus a three-letter uppercase `currency`. It accepts `direction`, `max_hops` (1–10), and `max_paths` (1–1,000). The response includes `paths`, `truncated`, `expansions`, `transaction_count`, `snapshot_sha256`, `rule_version`, `attribution_method`, and assumptions. Decimal amounts are JSON strings.
+Trace requires time-zone-aware `start` and `end` plus a three-letter uppercase `currency`. It accepts `direction`, `max_hops` (1–10), `max_paths` (1–1,000), and `max_expansions` (1–10,000). The response also includes conservative allocations that consume each observed transfer capacity once in deterministic path order. This is a reproducible allocation policy, not proof of economic ownership. Decimal amounts are JSON strings.
 
 Errors include 401 for credentials, 404 for an unknown account, 409 for idempotency conflicts, and 422 for invalid input. The generated `X-Correlation-ID` links the request to audit records and ingestion events.
 

@@ -73,8 +73,18 @@ class PathOutput(BaseModel):
     terminated_by_cycle: bool
 
 
+class AllocationOutput(BaseModel):
+    transaction_ids: List[str]
+    account_ids: List[str]
+    amount: Decimal
+    currency: str
+    method: str
+
+
 class TraceOutput(BaseModel):
     paths: List[PathOutput]
+    conservative_allocations: List[AllocationOutput]
+    allocated_total: Decimal
     truncated: bool
     expansions: int
     snapshot_sha256: str

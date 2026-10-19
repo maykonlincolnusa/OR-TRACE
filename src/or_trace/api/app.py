@@ -23,7 +23,7 @@ def create_app(ledger=None, audit=None, api_key=None, environment=None):
         raise RuntimeError("OR_TRACE_API_KEY is required outside development")
     if environment != "development" and ledger is None:
         raise RuntimeError("A durable Ledger adapter is required outside development")
-    app = FastAPI(title="OR TRACE", version="0.2.0")
+    app = FastAPI(title="OR TRACE", version="0.3.0")
     app.state.ledger = ledger if ledger is not None else MemoryLedger()
     audit = audit if audit is not None else LoggingAuditSink()
     ingestion = IngestionService(app.state.ledger)
@@ -110,11 +110,13 @@ def create_app(ledger=None, audit=None, api_key=None, environment=None):
         direction: str = Query("forward", pattern="^(forward|backward)$"),
         max_hops: int = Query(5, ge=1, le=10),
         max_paths: int = Query(100, ge=1, le=1000),
+        max_expansions: int = Query(10000, ge=1, le=10000),
     ):
         if start.utcoffset() is None or end.utcoffset() is None:
             raise HTTPException(422, "timestamps require timezone")
         try:
-            return tracing.trace(account_id, direction, start, end, currency, max_hops, max_paths)
+            return tracing.trace(account_id, direction, start, end, currency, max_hops,
+                                 max_paths, max_expansions)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
 

@@ -98,8 +98,12 @@ class TraceService:
             if expansions >= max_expansions or len(paths) >= max_paths:
                 truncated = True
                 break
+        selected_paths = paths[:max_paths]
+        allocations = self._allocate_paths(selected_paths, transactions)
         return {
-            "paths": paths[:max_paths],
+            "paths": selected_paths,
+            "conservative_allocations": allocations,
+            "allocated_total": format(sum((Decimal(item["amount"]) for item in allocations), Decimal("0")), "f"),
             "truncated": truncated,
             "expansions": expansions,
             "snapshot_sha256": snapshot_fingerprint(transactions),
@@ -110,9 +114,28 @@ class TraceService:
                 "Strictly increasing transaction timestamps; equal timestamps are ambiguous",
                 "Bottleneck is an upper bound per path, never an allocated amount",
                 "Paths may overlap; do not sum bottlenecks",
+                "Conservative allocations consume each observed transfer capacity once in deterministic path order",
                 "Results cover only ingested transactions in the requested window",
             ],
         }
+
+    @staticmethod
+    def _allocate_paths(paths, transactions):
+        """Allocate residual edge capacity once across overlapping paths."""
+        residual = {transaction.id: transaction.amount for transaction in transactions}
+        allocations = []
+        for path in sorted(paths, key=lambda item: (item.transaction_ids, item.account_ids)):
+            amount = min((residual[identifier] for identifier in path.transaction_ids),
+                         default=Decimal("0"))
+            if amount <= 0:
+                continue
+            for identifier in path.transaction_ids:
+                residual[identifier] -= amount
+            allocations.append({"transaction_ids": list(path.transaction_ids),
+                                "account_ids": list(path.account_ids),
+                                "amount": format(amount, "f"), "currency": path.currency,
+                                "method": "DETERMINISTIC_RESIDUAL_CAPACITY"})
+        return allocations
 
     def _path(self, edges, accounts, direction, cycle, outgoing, incoming):
         if direction == "backward":
